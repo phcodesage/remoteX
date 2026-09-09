@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import httpx
+import re
 
 from common.tls import trusted_tls_context
 
@@ -45,6 +46,9 @@ class ApiClient:
                     detail = response.json().get("detail", response.text)
                 except ValueError:
                     detail = response.text[:500] or f"HTTP {response.status_code}"
+            if isinstance(detail, list):
+                messages = [item.get("msg") for item in detail if isinstance(item, dict) and item.get("msg")]
+                detail = messages[0] if messages else "The request was invalid"
             raise ApiError(str(detail))
         return response
 
@@ -69,6 +73,9 @@ class ApiClient:
         return self._request("POST", "/api/v1/sessions", json={"device_id": device_id}).json()
 
     def claim_pairing(self, pairing_code: str) -> dict:
+        digits = re.sub(r"\D", "", pairing_code)
+        if len(digits) == 6:
+            pairing_code = f"{digits[:3]}-{digits[3:]}"
         session = self._request(
             "POST", "/api/v1/guest/sessions/pair", json={"pairing_code": pairing_code}
         ).json()

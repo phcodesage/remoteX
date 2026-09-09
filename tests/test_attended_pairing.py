@@ -19,7 +19,7 @@ def test_attended_pairing_requires_no_user_token(tmp_path) -> None:
 
         paired = client.post(
             "/api/v1/guest/sessions/pair",
-            json={"pairing_code": host["pairing_code"]},
+            json={"pairing_code": host["pairing_code"].replace("-", "")},
         )
         assert paired.status_code == 200
         session = paired.json()

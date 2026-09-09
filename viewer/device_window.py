@@ -66,8 +66,9 @@ class DashboardWindow(QWidget):
         pair.clicked.connect(self.claim_pairing)
         heading.addWidget(pair)
         instructions = QLabel(
-            "On the remote computer, open RemoteX and share the six-digit pairing code. "
-            "The remote user must click Allow before screen control starts."
+            "Each computer shows its own six-digit pairing code in the left sidebar. "
+            "Enter the OTHER computer's code here; the remote user must click Allow "
+            "before screen control starts."
         )
         instructions.setObjectName("muted")
         instructions.setWordWrap(True)
@@ -84,7 +85,11 @@ class DashboardWindow(QWidget):
         return
 
     def claim_pairing(self) -> None:
-        code, accepted = QInputDialog.getText(self, "Connect a remote device", "Enter pairing code (000-000):")
+        code, accepted = QInputDialog.getText(
+            self,
+            "Connect a remote device",
+            "Enter the other computer's pairing code (000-000):",
+        )
         if not accepted or not code.strip():
             return
         try:

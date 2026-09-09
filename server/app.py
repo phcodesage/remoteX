@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -8,7 +9,7 @@ from datetime import timedelta
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -55,6 +56,15 @@ class AuthResponse(BaseModel):
 
 class PairingClaim(BaseModel):
     pairing_code: str = Field(min_length=7, max_length=7)
+
+    @field_validator("pairing_code", mode="before")
+    @classmethod
+    def normalize_pairing_code(cls, value: object) -> object:
+        code = str(value).strip()
+        digits = re.sub(r"\D", "", code)
+        if len(digits) == 6:
+            return f"{digits[:3]}-{digits[3:]}"
+        return code
 
 
 class SessionResponse(BaseModel):
