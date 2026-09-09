@@ -22,10 +22,19 @@ class ApiClient:
         except httpx.HTTPError as exc:
             raise ApiError(f"Server unavailable: {exc}") from exc
         if response.is_error:
-            try:
-                detail = response.json().get("detail", response.text)
-            except ValueError:
-                detail = response.text
+            content_type = response.headers.get("content-type", "")
+            if response.status_code in {502, 503, 504} and "text/html" in content_type:
+                detail = (
+                    f"The control server returned HTTP {response.status_code} at {self.base_url}. "
+                    "Cloudflare reached the domain, but the tunnel cannot reach its origin. "
+                    "On the host computer, verify that RemoteX is running in host mode and "
+                    "that the tunnel forwards to http://127.0.0.1:8080."
+                )
+            else:
+                try:
+                    detail = response.json().get("detail", response.text)
+                except ValueError:
+                    detail = response.text[:500] or f"HTTP {response.status_code}"
             raise ApiError(str(detail))
         return response
 
