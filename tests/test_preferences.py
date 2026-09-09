@@ -14,8 +14,10 @@ def test_preferences_normalize_server_url(monkeypatch, tmp_path) -> None:
 
 def test_remote_preferences_use_tunnel(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("REMOTEX_SETTINGS_FILE", str(tmp_path / "preferences.json"))
-    save_preferences(AppPreferences(server_url="https://control.example.com"))
-    assert load_preferences().effective_server_url == "https://control.example.com"
+    save_preferences(AppPreferences(server_url="https://control.example.com", access_token="token-123"))
+    loaded = load_preferences()
+    assert loaded.effective_server_url == "https://control.example.com"
+    assert loaded.access_token == "token-123"
 
 
 def test_default_server_url_uses_tunnel(monkeypatch, tmp_path) -> None:

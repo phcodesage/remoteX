@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
         self.connection_status.setText("Connecting…")
         try:
             client = ApiClient(self.preferences.effective_server_url)
-            access_token = configured_value("REMOTE_ACCESS_TOKEN") or configured_value(
+            access_token = self.preferences.access_token or configured_value("REMOTE_ACCESS_TOKEN") or configured_value(
                 "REMOTE_OWNER_TOKEN"
             )
             if access_token:
@@ -130,7 +130,13 @@ class MainWindow(QMainWindow):
                 client.local_authenticate()
             self.attach_client(client)
         except (ApiError, OSError, RuntimeError) as exc:
-            self.connection_status.setText(f"Connection unavailable: {exc}")
+            message = str(exc)
+            if message == "Local auth is disabled":
+                message = (
+                    "Server is reachable, but this tunneled connection needs a shared access token. "
+                    "Open Settings and paste the token created on the backend host."
+                )
+            self.connection_status.setText(f"Connection unavailable: {message}")
             self.start_button.setEnabled(True)
 
     def attach_client(self, client: ApiClient) -> None:

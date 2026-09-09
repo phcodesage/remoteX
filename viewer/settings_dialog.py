@@ -24,7 +24,8 @@ class SettingsDialog(QDialog):
 
         intro = QLabel(
             "Set the HTTPS control-server address used by this computer. "
-            "To host the service, run `python3 run.py backend` separately."
+            "To host the service, run `python3 run.py backend` separately. "
+            "A shared access token is required when connecting through a tunnel."
         )
         intro.setWordWrap(True)
         intro.setObjectName("muted")
@@ -33,8 +34,14 @@ class SettingsDialog(QDialog):
         self.server_url.setPlaceholderText("https://remotex.chat-x.site")
         self.server_url.setToolTip("Public HTTPS/WSS domain used by other computers.")
 
+        self.access_token = QLineEdit(preferences.access_token)
+        self.access_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.access_token.setPlaceholderText("Paste shared access token")
+        self.access_token.setToolTip("Stored locally in the protected RemoteX preferences file.")
+
         form = QFormLayout()
         form.addRow("Tunneled control domain", self.server_url)
+        form.addRow("Shared access token", self.access_token)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -59,6 +66,7 @@ class SettingsDialog(QDialog):
             return
         self._preferences = AppPreferences(
             server_url=value,
+            access_token=self.access_token.text().strip(),
         )
         super().accept()
 

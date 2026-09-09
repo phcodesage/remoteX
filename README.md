@@ -42,7 +42,7 @@ The host can create a local prototype access token with:
 curl -s -X POST http://127.0.0.1:8080/api/v1/auth/local
 ```
 
-Put the returned `access_token` in `REMOTE_ACCESS_TOKEN` in `.env` on both computers. RemoteX reads this value directly from `.env`; it does not require an auth screen.
+Paste the returned `access_token` into **Settings → Shared access token** on each desktop UI. Alternatively, put it in `REMOTE_ACCESS_TOKEN` in `.env`. RemoteX does not require a sign-in screen.
 
 The prototype has no sign-in or sign-up screen. With `REMOTE_LOCAL_AUTH_ENABLED=true`, a localhost server creates a local session automatically. For a shared/external server, put an existing access token in `REMOTE_ACCESS_TOKEN`; the desktop UI still stays single-screen and does not show auth forms.
 

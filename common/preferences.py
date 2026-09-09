@@ -16,6 +16,7 @@ class AppPreferences:
     """Per-computer UI settings shared by the viewer and agent."""
 
     server_url: str = DEFAULT_PUBLIC_SERVER_URL
+    access_token: str = ""
 
     @property
     def effective_server_url(self) -> str:
@@ -50,7 +51,8 @@ def _default_preferences() -> AppPreferences:
         if not env_url or parsed.hostname in {"127.0.0.1", "localhost", "::1"}
         else env_url
     )
-    return AppPreferences(server_url=normalize_server_url(public_url))
+    access_token = configured_value("REMOTE_ACCESS_TOKEN") or configured_value("REMOTE_OWNER_TOKEN") or ""
+    return AppPreferences(server_url=normalize_server_url(public_url), access_token=access_token.strip())
 
 
 def load_preferences() -> AppPreferences:
@@ -60,7 +62,12 @@ def load_preferences() -> AppPreferences:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         server_url = normalize_server_url(str(payload.get("server_url", DEFAULT_PUBLIC_SERVER_URL)))
-        return AppPreferences(server_url=server_url)
+        access_token = str(payload.get("access_token", "")).strip()
+        if not access_token:
+            access_token = (
+                configured_value("REMOTE_ACCESS_TOKEN") or configured_value("REMOTE_OWNER_TOKEN") or ""
+            ).strip()
+        return AppPreferences(server_url=server_url, access_token=access_token)
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return _default_preferences()
 
