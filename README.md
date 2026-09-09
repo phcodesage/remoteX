@@ -18,6 +18,8 @@ cp .env.example .env
 
 The repository uses one project-local virtual environment at `.venv`. It is ignored by Git because its native packages are platform-specific; `./setup.sh` creates or repairs it on each computer.
 
+The setup pins the compatible PyAV 17 line and requires its prebuilt wheel. This avoids the PyAV 12 Cython build failure that can occur on Python 3.13.
+
 `.venv/bin/python run.py` is the normal one-command startup. It opens the unified desktop UI and automatically starts the local FastAPI server when `REMOTE_SERVER_URL` is localhost. Use `.venv/bin/python run.py doctor` for diagnostics or `.venv/bin/python run.py server` when running the server as a separate service.
 
 After setup, every role can be launched through the same environment:

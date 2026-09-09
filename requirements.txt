@@ -1,5 +1,7 @@
-aiortc>=1.9
-av>=12
+aiortc>=1.15.0,<2
+# aiortc 1.15 supports PyAV 14-17. Pin the newest supported line so Python 3.13
+# receives a prebuilt wheel instead of trying to compile the older PyAV 12 source.
+av>=17.1.0,<18
 fastapi>=0.115
 uvicorn[standard]>=0.30
 websockets>=13
@@ -13,4 +15,3 @@ argon2-cffi>=23.1
 httpx>=0.27
 numpy>=1.26
 PyJWT>=2.9
-

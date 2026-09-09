@@ -11,7 +11,7 @@ fi
 
 echo "Installing remoteX dependencies into $PROJECT_DIR/.venv"
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install --only-binary=av -r requirements.txt
 
 echo
 echo "remoteX is ready. Start it with:"
