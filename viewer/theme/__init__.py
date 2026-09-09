@@ -1,0 +1,2 @@
+"""Dark colorful viewer theme."""
+

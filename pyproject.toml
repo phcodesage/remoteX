@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-remote"
+version = "0.1.0"
+description = "Attended Python remote-support system using FastAPI, PySide6, and WebRTC"
+requires-python = ">=3.11"
+dependencies = [
+    "aiortc>=1.9",
+    "av>=12",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "websockets>=13",
+    "mss>=9",
+    "pyautogui>=0.9",
+    "PySide6>=6.7",
+    "cryptography>=43",
+    "sqlalchemy>=2.0",
+    "pydantic-settings>=2.5",
+    "argon2-cffi>=23.1",
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "PyJWT>=2.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+include = ["common*", "server*", "agent*", "viewer*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
