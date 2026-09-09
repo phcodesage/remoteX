@@ -132,9 +132,24 @@ class AgentWorker(QThread):
                     session_id, approved = decision
                     payload = pending.pop(session_id, {})
                     message_type = SignalType.SESSION_APPROVED if approved else SignalType.SESSION_REJECTED
-                    await socket.send(
-                        json.dumps({"type": message_type, "session_id": session_id, "payload": {}})
-                    )
+                    try:
+                        async with httpx.AsyncClient(
+                            base_url=settings.server_url,
+                            timeout=15,
+                            verify=trusted_tls_context(settings.server_url),
+                        ) as client:
+                            response = await client.post(
+                                f"/api/v1/sessions/{session_id}/{'approve' if approved else 'reject'}",
+                                headers={"X-Device-Token": device_token},
+                            )
+                            response.raise_for_status()
+                    except httpx.HTTPError as exc:
+                        # Keep compatibility with an older backend while the
+                        # host and server are being upgraded together.
+                        self.error.emit(f"Approval update failed; using signaling fallback: {exc}")
+                        await socket.send(
+                            json.dumps({"type": message_type, "session_id": session_id, "payload": {}})
+                        )
                     if approved:
                         try:
                             await AgentRtcSession(

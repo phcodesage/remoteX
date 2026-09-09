@@ -24,6 +24,7 @@ def test_attended_pairing_requires_no_user_token(tmp_path) -> None:
         assert paired.status_code == 200
         session = paired.json()
         assert session["device_name"] == "Remote Mac"
+        assert session["pairing_code"] == host["pairing_code"]
         assert session["signaling_token"]
 
         current = client.get(
@@ -31,6 +32,16 @@ def test_attended_pairing_requires_no_user_token(tmp_path) -> None:
             headers={"X-Session-Token": session["signaling_token"]},
         )
         assert current.status_code == 200
+
+        approved = client.post(
+            f"/api/v1/sessions/{session['id']}/approve",
+            headers={"X-Device-Token": host["device_token"]},
+        )
+        assert approved.status_code == 200
+        assert client.get(
+            f"/api/v1/sessions/{session['id']}",
+            headers={"X-Session-Token": session["signaling_token"]},
+        ).json()["status"] == "active"
 
 
 def test_attended_registration_recovers_stale_device_token(tmp_path) -> None:

@@ -18,7 +18,8 @@ class SessionWindow(QMainWindow):
         self.setWindowTitle(f"Remote Desktop · {device_name}")
         self.resize(1100, 760)
         self.screen = RemoteScreenWidget()
-        self.status = QLabel(f"Pairing code: {session.get('pairing_code', 'sent to remote user')} · Waiting for approval")
+        pairing_code = session.get("pairing_code") or "verified"
+        self.status = QLabel(f"Pairing code: {pairing_code} · Waiting for approval")
         self.status.setObjectName("muted")
         end = QPushButton("End session")
         end.setObjectName("danger")
@@ -51,7 +52,10 @@ class SessionWindow(QMainWindow):
         except ApiError as exc:
             self.status.setText(str(exc))
             return
-        if session["status"] == "active" and self.worker is None:
+        if session["status"] == "awaiting_approval":
+            self.status.setText("Waiting for the remote user to approve…")
+        elif session["status"] == "active" and self.worker is None:
+            self.status.setText("Approved · Starting secure screen connection…")
             self.poller.stop()
             self.start_worker()
         elif session["status"] in {"rejected", "expired", "revoked", "ended"}:
@@ -59,11 +63,17 @@ class SessionWindow(QMainWindow):
             self.poller.stop()
 
     def start_worker(self) -> None:
+        try:
+            ice_servers = self.client.ice_servers()
+        except ApiError as exc:
+            self.status.setText(f"TURN/ICE configuration unavailable: {exc}")
+            self.poller.start(1000)
+            return
         self.worker = ViewerRtcWorker(
             self.client.base_url,
             self.session_data.get("signaling_token", self.client.token),
             self.session_data["id"],
-            self.client.ice_servers(),
+            ice_servers,
         )
         self.worker.frame_ready.connect(self.screen.set_frame)
         self.worker.status_changed.connect(self.status.setText)

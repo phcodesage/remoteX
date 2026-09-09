@@ -490,6 +490,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             device_id=device.id,
             device_name=device.name,
             status=remote_session.status,
+            pairing_code=payload.pairing_code,
             signaling_token=issue_signaling_token(controller.id, remote_session.id, "controller", settings),
             expires_at=iso(remote_session.expires_at) or "",
         )

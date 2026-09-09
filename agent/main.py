@@ -62,9 +62,21 @@ async def run_agent_async() -> None:
                     )
                     response_type = "session_approved" if approved else "session_rejected"
                     session_id = message["session_id"]
-                    await socket.send(
-                        json.dumps({"type": response_type, "session_id": session_id, "payload": {}})
-                    )
+                    try:
+                        async with httpx.AsyncClient(
+                            base_url=settings.server_url,
+                            timeout=15,
+                            verify=trusted_tls_context(settings.server_url),
+                        ) as client:
+                            response = await client.post(
+                                f"/api/v1/sessions/{session_id}/{'approve' if approved else 'reject'}",
+                                headers={"X-Device-Token": credentials.device_token},
+                            )
+                            response.raise_for_status()
+                    except httpx.HTTPError:
+                        await socket.send(
+                            json.dumps({"type": response_type, "session_id": session_id, "payload": {}})
+                        )
                     if approved:
                         try:
                             await AgentRtcSession(
