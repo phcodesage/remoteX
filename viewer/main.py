@@ -9,22 +9,27 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QDialog,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from agent.desktop_worker import AgentWorker
+from common.preferences import AppPreferences, load_preferences, save_preferences
 from viewer.api_client import ApiClient, ApiError
 from viewer.device_window import DashboardWindow
+from viewer.settings_dialog import SettingsDialog
 from viewer.theme.styles import stylesheet
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, client: ApiClient) -> None:
+    def __init__(self, client: ApiClient, preferences: AppPreferences) -> None:
         super().__init__()
         self.client = client
+        self.preferences = preferences
         self.setWindowTitle("RemoteX · Control Center")
         self.resize(1080, 720)
         top = QFrame()
@@ -46,8 +51,13 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(QLabel("Devices"))
         side_layout.addWidget(QLabel("Sessions"))
         side_layout.addWidget(QLabel("Files"))
-        side_layout.addWidget(QLabel("Settings"))
+        settings = QPushButton("Settings")
+        settings.setObjectName("utility")
+        settings.clicked.connect(self.open_settings)
+        side_layout.addWidget(settings)
         side_layout.addStretch()
+        mode = "Host mode" if preferences.host_mode else "Remote mode"
+        side_layout.addWidget(QLabel(f"{mode} · {preferences.server_url}"))
         side_layout.addWidget(QLabel("Attended support only"))
         dashboard = DashboardWindow(client)
         content = QWidget()
@@ -103,11 +113,24 @@ class MainWindow(QMainWindow):
             self.agent_worker.stop()
         event.accept()
 
+    def open_settings(self) -> None:
+        dialog = SettingsDialog(self.preferences, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self.preferences = dialog.preferences()
+        save_preferences(self.preferences)
+        QMessageBox.information(
+            self,
+            "Settings saved",
+            "Restart RemoteX for the new host or tunnel settings to take effect.",
+        )
+
 
 def run_unified() -> None:
     app = QApplication(sys.argv)
     app.setStyleSheet(stylesheet())
-    client = ApiClient(os.getenv("REMOTE_SERVER_URL", "http://127.0.0.1:8000"))
+    preferences = load_preferences()
+    client = ApiClient(preferences.effective_server_url)
     access_token = os.getenv("REMOTE_ACCESS_TOKEN") or os.getenv("REMOTE_OWNER_TOKEN")
     if access_token:
         client.token = access_token
@@ -123,7 +146,7 @@ def run_unified() -> None:
             return
     if not client.token:
         return
-    window = MainWindow(client)
+    window = MainWindow(client, preferences)
     window.show()
     sys.exit(app.exec())
 

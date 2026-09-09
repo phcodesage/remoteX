@@ -8,14 +8,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_prefix="REMOTE_")
 
-    server_url: str = "http://127.0.0.1:8000"
+    server_url: str = "https://remotex.chat-x.site"
     host: str = "127.0.0.1"
-    port: int = 8000
+    port: int = 8080
     database_url: str = "sqlite:///./remote_support.sqlite3"
     jwt_secret: str = "development-only-change-me-please-rotate"
     jwt_ttl_minutes: int = 30
     pairing_ttl_minutes: int = 10
-    local_auth_enabled: bool = False
+    local_auth_enabled: bool = True
     stun_urls: str = "stun:stun.cloudflare.com:3478"
     turn_urls: str = ""
     turn_username: str = ""

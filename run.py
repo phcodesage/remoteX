@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 from pathlib import Path
 
+from common.preferences import load_preferences
+
 VERSION = "0.1.0"
 
 
@@ -29,10 +31,12 @@ def ensure_local_server() -> None:
     from server.config import get_settings
 
     settings = get_settings()
-    parsed = urlparse(settings.server_url)
+    preferences = load_preferences()
+    if not preferences.host_mode:
+        return
+    parsed = urlparse(preferences.effective_server_url)
     local_hosts = {"127.0.0.1", "localhost", "::1"}
-    autostart = os.getenv("REMOTE_AUTOSTART_SERVER", "true").lower() in {"1", "true", "yes", "on"}
-    if not autostart or parsed.hostname not in local_hosts:
+    if parsed.hostname not in local_hosts:
         return
     base_url = f"{parsed.scheme}://{parsed.netloc}"
     if _healthy(base_url):
@@ -42,9 +46,18 @@ def ensure_local_server() -> None:
     from server.app import create_app
 
     host = "127.0.0.1" if parsed.hostname in {"localhost", "127.0.0.1"} else "::1"
-    port = parsed.port or settings.port
+    host_settings = settings.model_copy(
+        update={
+            "server_url": preferences.effective_server_url,
+            "host": host,
+            "port": preferences.host_port,
+            "local_auth_enabled": True,
+        }
+    )
     thread = threading.Thread(
-        target=lambda: uvicorn.run(create_app(settings), host=host, port=port, log_level="warning"),
+        target=lambda: uvicorn.run(
+            create_app(host_settings), host=host, port=preferences.host_port, log_level="warning"
+        ),
         name="remotex-server",
         daemon=True,
     )
@@ -107,8 +120,7 @@ def main() -> int:
         run_server()
         return 0
     if role in {"desktop", "agent", "viewer"}:
-        if role == "desktop":
-            ensure_local_server()
+        ensure_local_server()
         from viewer.main import run_unified
         run_unified()
         return 0

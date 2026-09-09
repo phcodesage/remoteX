@@ -20,7 +20,7 @@ The repository uses one project-local virtual environment at `.venv`. It is igno
 
 The setup requires a compatible prebuilt PyAV wheel. Modern macOS uses the newer aiortc/PyAV line; older macOS can fall back to the compatible aiortc 1.10/PyAV 13 line. This avoids the PyAV 12 Cython build failure that can occur on Python 3.13.
 
-`.venv/bin/python run.py` is the normal one-command startup. It opens the unified desktop UI and automatically starts the local FastAPI server when `REMOTE_SERVER_URL` is localhost. Use `.venv/bin/python run.py doctor` for diagnostics or `.venv/bin/python run.py server` when running the server as a separate service.
+`.venv/bin/python run.py` is the normal one-command startup. It opens the unified desktop UI. Open **Settings** to choose **Make this computer the host**, set the tunneled control domain, and choose the local host port. Use `.venv/bin/python run.py doctor` for diagnostics or `.venv/bin/python run.py server` when running the server as a separate service.
 
 After setup, every role can be launched through the same environment:
 
@@ -31,6 +31,8 @@ After setup, every role can be launched through the same environment:
 ```
 
 Alternatively, activate the same environment first with `source .venv/bin/activate` and then use `python run.py`.
+
+For the current tunnel, enable **Make this computer the host** on the old/host Mac and keep the domain as `https://remotex.chat-x.site`. RemoteX then starts FastAPI on `127.0.0.1:8080`; configure the tunnel to forward `remotex.chat-x.site` to that local port. On the other computer, leave host mode off so it connects to the same domain. Both computers must use the same authenticated server account/token.
 
 The prototype has no sign-in or sign-up screen. With `REMOTE_LOCAL_AUTH_ENABLED=true`, a localhost server creates a local session automatically. For a shared/external server, put an existing access token in `REMOTE_ACCESS_TOKEN`; the desktop UI still stays single-screen and does not show auth forms.
 
@@ -58,7 +60,7 @@ The agent shows an in-app attended approval dialog. Only after approval does the
 
 ## Cloudflare networking
 
-`REMOTE_SERVER_URL` can point at the HTTPS hostname exposed by Cloudflare Tunnel. The tunnel carries the FastAPI HTTP and WebSocket control traffic.
+`REMOTE_SERVER_URL` can point at the HTTPS hostname exposed by Cloudflare Tunnel. The default control domain is `https://remotex.chat-x.site`. The tunnel carries the FastAPI HTTP and WebSocket control traffic. In host mode, RemoteX starts FastAPI on `127.0.0.1:8080`, so the tunnel should forward that local port.
 
 WebRTC media needs ICE servers. The preferred setup gives FastAPI a Cloudflare Realtime TURN key ID and API token:
 
