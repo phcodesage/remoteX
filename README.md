@@ -11,14 +11,24 @@ The agent never opens an inbound listening port. It keeps an outbound WebSocket 
 ## Run locally
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+./setup.sh
 cp .env.example .env
-python3 run.py
+.venv/bin/python run.py
 ```
 
-`python3 run.py` is the normal one-command startup. It opens the unified desktop UI and automatically starts the local FastAPI server when `REMOTE_SERVER_URL` is localhost. Use `python3 run.py doctor` for diagnostics or `python3 run.py server` when running the server as a separate service.
+The repository uses one project-local virtual environment at `.venv`. It is ignored by Git because its native packages are platform-specific; `./setup.sh` creates or repairs it on each computer.
+
+`.venv/bin/python run.py` is the normal one-command startup. It opens the unified desktop UI and automatically starts the local FastAPI server when `REMOTE_SERVER_URL` is localhost. Use `.venv/bin/python run.py doctor` for diagnostics or `.venv/bin/python run.py server` when running the server as a separate service.
+
+After setup, every role can be launched through the same environment:
+
+```bash
+.venv/bin/python run.py
+.venv/bin/python run.py server
+.venv/bin/python run.py doctor
+```
+
+Alternatively, activate the same environment first with `source .venv/bin/activate` and then use `python run.py`.
 
 The prototype has no sign-in or sign-up screen. With `REMOTE_LOCAL_AUTH_ENABLED=true`, a localhost server creates a local session automatically. For a shared/external server, put an existing access token in `REMOTE_ACCESS_TOKEN`; the desktop UI still stays single-screen and does not show auth forms.
 
@@ -33,13 +43,13 @@ curl -s http://127.0.0.1:8000/api/v1/auth/register \
 Copy the returned `access_token` into `REMOTE_ACCESS_TOKEN` only when using a shared server:
 
 ```bash
-python3 run.py
+.venv/bin/python run.py
 ```
 
-`python3 run.py agent` opens the exact same UI. Each computer can therefore be both a controller and a remote device:
+`.venv/bin/python run.py agent` opens the exact same UI. Each computer can therefore be both a controller and a remote device:
 
 ```bash
-python3 run.py agent
+.venv/bin/python run.py agent
 ```
 
 The agent shows an in-app attended approval dialog. Only after approval does the viewer create the WebRTC offer and the screen/control session become active.
