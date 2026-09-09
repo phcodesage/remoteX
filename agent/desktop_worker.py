@@ -15,6 +15,7 @@ from agent.config import AgentSettings
 from agent.registration import AgentRegistration
 from common.models import SignalType
 from common.network import websocket_url
+from common.tls import trusted_tls_context
 
 
 class AgentWorker(QThread):
@@ -58,7 +59,11 @@ class AgentWorker(QThread):
         registration = AgentRegistration(settings)
         _, credentials = await registration.ensure_registered(self.access_token)
         self.device_ready.emit(credentials.device_id)
-        async with httpx.AsyncClient(base_url=self.server_url, timeout=15) as client:
+        async with httpx.AsyncClient(
+            base_url=self.server_url,
+            timeout=15,
+            verify=trusted_tls_context(self.server_url),
+        ) as client:
             response = await client.get("/api/v1/config/ice")
             response.raise_for_status()
             ice_servers = response.json().get("ice_servers", [])
@@ -85,7 +90,12 @@ class AgentWorker(QThread):
         )
         while not self.stopping.is_set():
             try:
-                async with websockets.connect(agent_url, ping_interval=20, max_size=2 * 1024 * 1024) as socket:
+                async with websockets.connect(
+                    agent_url,
+                    ssl=trusted_tls_context(agent_url),
+                    ping_interval=20,
+                    max_size=2 * 1024 * 1024,
+                ) as socket:
                     self.status_changed.emit("This computer is online")
                     await self._serve_socket(socket, settings, credentials.device_token, ice_servers)
             except (websockets.exceptions.ConnectionClosed, OSError, httpx.HTTPError) as exc:

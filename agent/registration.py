@@ -7,6 +7,7 @@ import httpx
 
 from agent.config import AgentSettings
 from agent.device_identity import DeviceCredentials, DeviceIdentity
+from common.tls import trusted_tls_context
 
 
 class AgentRegistration:
@@ -29,7 +30,11 @@ class AgentRegistration:
             # local profiles, so verify the saved device belongs to the current
             # controller before reusing it.
             if owner_token:
-                async with httpx.AsyncClient(base_url=self.settings.server_url, timeout=15) as client:
+                async with httpx.AsyncClient(
+                    base_url=self.settings.server_url,
+                    timeout=15,
+                    verify=trusted_tls_context(self.settings.server_url),
+                ) as client:
                     response = await client.get(
                         "/api/v1/devices",
                         headers={"Authorization": f"Bearer {owner_token}"},
@@ -41,7 +46,11 @@ class AgentRegistration:
                 credentials = None
             else:
                 return identity, credentials
-        async with httpx.AsyncClient(base_url=self.settings.server_url, timeout=15) as client:
+        async with httpx.AsyncClient(
+            base_url=self.settings.server_url,
+            timeout=15,
+            verify=trusted_tls_context(self.settings.server_url),
+        ) as client:
             request = {
                 "name": self.settings.device_name,
                 "platform": f"{platform.system()} {platform.release()}",

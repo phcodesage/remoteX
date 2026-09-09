@@ -8,6 +8,7 @@ import websockets
 from aiortc import RTCPeerConnection, RTCConfiguration, RTCIceServer
 
 from common.network import websocket_url
+from common.tls import trusted_tls_context
 from agent.input_controller import InputController
 from agent.screen_track import MssScreenTrack
 
@@ -42,7 +43,12 @@ class AgentRtcSession:
             self.server_url,
             f"/api/v1/signaling/{quote(self.session_id)}?role=agent&token={quote(self.signal_token)}",
         )
-        async with websockets.connect(signal_url, ping_interval=20, max_size=8 * 1024 * 1024) as signal:
+        async with websockets.connect(
+            signal_url,
+            ssl=trusted_tls_context(signal_url),
+            ping_interval=20,
+            max_size=8 * 1024 * 1024,
+        ) as signal:
             self.peer = RTCPeerConnection(self.rtc_configuration())
             self.track = MssScreenTrack()
             self.peer.addTrack(self.track)

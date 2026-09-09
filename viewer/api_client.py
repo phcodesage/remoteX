@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import httpx
 
+from common.tls import trusted_tls_context
+
 
 class ApiError(RuntimeError):
     pass
@@ -19,7 +21,14 @@ class ApiClient:
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         try:
-            response = httpx.request(method, self.base_url + path, headers=headers, timeout=15, **kwargs)
+            response = httpx.request(
+                method,
+                self.base_url + path,
+                headers=headers,
+                timeout=15,
+                verify=trusted_tls_context(self.base_url),
+                **kwargs,
+            )
         except httpx.HTTPError as exc:
             raise ApiError(f"Server unavailable: {exc}") from exc
         if response.is_error:

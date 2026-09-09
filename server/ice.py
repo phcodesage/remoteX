@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from server.config import Settings
+from common.tls import trusted_tls_context
 
 
 async def get_ice_servers(settings: Settings) -> list[dict]:
@@ -12,7 +13,10 @@ async def get_ice_servers(settings: Settings) -> list[dict]:
             "https://rtc.live.cloudflare.com/v1/turn/keys/"
             f"{settings.cloudflare_turn_key_id}/credentials/generate-ice-servers"
         )
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(
+            timeout=15,
+            verify=trusted_tls_context(url),
+        ) as client:
             response = await client.post(
                 url,
                 headers={"Authorization": f"Bearer {settings.cloudflare_turn_api_token}"},
@@ -22,4 +26,3 @@ async def get_ice_servers(settings: Settings) -> list[dict]:
             payload = response.json()
         return payload.get("iceServers", [])
     return settings.ice_servers()
-

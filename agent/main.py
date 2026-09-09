@@ -11,13 +11,18 @@ from agent.agent_rtc import AgentRtcSession, websocket_url
 from agent.config import get_agent_settings
 from agent.permissions import ask_for_approval
 from agent.registration import AgentRegistration
+from common.tls import trusted_tls_context
 
 
 async def run_agent_async() -> None:
     settings = get_agent_settings()
     _, credentials = await AgentRegistration(settings).ensure_registered()
     ice_config = {"ice_servers": []}
-    async with httpx.AsyncClient(base_url=settings.server_url, timeout=15) as client:
+    async with httpx.AsyncClient(
+        base_url=settings.server_url,
+        timeout=15,
+        verify=trusted_tls_context(settings.server_url),
+    ) as client:
         response = await client.get("/api/v1/config/ice")
         response.raise_for_status()
         ice_config = response.json()
@@ -41,7 +46,12 @@ async def run_agent_async() -> None:
     print(f"Agent online as {settings.device_name}. Press Ctrl-C to stop.")
     while True:
         try:
-            async with websockets.connect(agent_url, ping_interval=20, max_size=2 * 1024 * 1024) as socket:
+            async with websockets.connect(
+                agent_url,
+                ssl=trusted_tls_context(agent_url),
+                ping_interval=20,
+                max_size=2 * 1024 * 1024,
+            ) as socket:
                 async for raw in socket:
                     message = json.loads(raw)
                     if message.get("type") != "session_request":

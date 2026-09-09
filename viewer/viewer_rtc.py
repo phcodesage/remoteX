@@ -12,6 +12,7 @@ from PySide6.QtGui import QImage
 from aiortc import RTCPeerConnection, RTCConfiguration, RTCIceServer
 
 from common.network import websocket_url
+from common.tls import trusted_tls_context
 
 
 class ViewerRtcWorker(QThread):
@@ -69,7 +70,12 @@ class ViewerRtcWorker(QThread):
             self.server_url,
             f"/api/v1/signaling/{quote(self.session_id)}?role=controller&token={quote(self.token)}",
         )
-        async with websockets.connect(signal_url, ping_interval=20, max_size=8 * 1024 * 1024) as signal:
+        async with websockets.connect(
+            signal_url,
+            ssl=trusted_tls_context(signal_url),
+            ping_interval=20,
+            max_size=8 * 1024 * 1024,
+        ) as signal:
             peer = RTCPeerConnection(self.rtc_configuration())
             control = peer.createDataChannel("control", ordered=True)
             peer.createDataChannel("telemetry", ordered=False, maxRetransmits=0)
