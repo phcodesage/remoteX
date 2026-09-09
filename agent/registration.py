@@ -16,11 +16,15 @@ class AgentRegistration:
         self.identity_path = data_dir / "identity.json"
         self.credentials_path = data_dir / "credentials.json"
 
-    async def ensure_registered(self, owner_token: str | None = None) -> tuple[DeviceIdentity, DeviceCredentials]:
+    async def ensure_registered(
+        self,
+        owner_token: str | None = None,
+        force: bool = False,
+    ) -> tuple[DeviceIdentity, DeviceCredentials]:
         identity = DeviceIdentity.load_or_create(self.identity_path)
         credentials = DeviceCredentials.load(self.credentials_path)
         owner_token = owner_token or self.settings.owner_token
-        if credentials:
+        if credentials and not force:
             # A saved device token is account-bound. The unified UI can switch
             # local profiles, so verify the saved device belongs to the current
             # controller before reusing it.

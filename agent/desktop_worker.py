@@ -55,7 +55,8 @@ class AgentWorker(QThread):
             device_name=self.device_name,
         )
         self.status_changed.emit("Registering this computer…")
-        _, credentials = await AgentRegistration(settings).ensure_registered(self.access_token)
+        registration = AgentRegistration(settings)
+        _, credentials = await registration.ensure_registered(self.access_token)
         self.device_ready.emit(credentials.device_id)
         async with httpx.AsyncClient(base_url=self.server_url, timeout=15) as client:
             response = await client.get("/api/v1/config/ice")
@@ -65,6 +66,16 @@ class AgentWorker(QThread):
                 "/api/v1/guest/devices/pairing",
                 headers={"X-Device-Token": credentials.device_token},
             )
+            if pairing.status_code == 401 and not self.access_token:
+                # Recover automatically when credentials.json belongs to an
+                # older server database or a previous installation.
+                self.status_changed.emit("Refreshing this computer’s registration…")
+                _, credentials = await registration.ensure_registered(force=True)
+                self.device_ready.emit(credentials.device_id)
+                pairing = await client.post(
+                    "/api/v1/guest/devices/pairing",
+                    headers={"X-Device-Token": credentials.device_token},
+                )
             pairing.raise_for_status()
             self.pairing_code.emit(pairing.json()["pairing_code"])
 

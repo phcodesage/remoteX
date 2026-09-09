@@ -25,6 +25,12 @@ async def run_agent_async() -> None:
             "/api/v1/guest/devices/pairing",
             headers={"X-Device-Token": credentials.device_token},
         )
+        if pairing.status_code == 401:
+            _, credentials = await AgentRegistration(settings).ensure_registered(force=True)
+            pairing = await client.post(
+                "/api/v1/guest/devices/pairing",
+                headers={"X-Device-Token": credentials.device_token},
+            )
         pairing.raise_for_status()
         print(f"Pairing code: {pairing.json()['pairing_code']}")
 

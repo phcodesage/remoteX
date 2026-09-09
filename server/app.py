@@ -232,16 +232,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """
         user = get_attended_user(db)
         device_token = secrets.token_urlsafe(32)
-        device = Device(
-            user_id=user.id,
-            name=payload.name,
-            platform=payload.platform,
-            public_key=payload.public_key,
-            device_token_hash=sha256_hex(device_token),
-            last_seen_at=utcnow(),
+        # A saved device token can become stale after a database reset or an
+        # upgrade. Reuse the device identity on re-registration so recovery
+        # does not create a second device card every time.
+        device = db.scalar(
+            select(Device).where(
+                Device.user_id == user.id,
+                Device.public_key == payload.public_key,
+                Device.revoked_at.is_(None),
+            )
         )
-        db.add(device)
-        db.flush()
+        if device:
+            device.name = payload.name
+            device.platform = payload.platform
+            device.device_token_hash = sha256_hex(device_token)
+            device.last_seen_at = utcnow()
+        else:
+            device = Device(
+                user_id=user.id,
+                name=payload.name,
+                platform=payload.platform,
+                public_key=payload.public_key,
+                device_token_hash=sha256_hex(device_token),
+                last_seen_at=utcnow(),
+            )
+            db.add(device)
+            db.flush()
         pairing_code, pairing = create_pairing_code(db, device)
         db.commit()
         return {
