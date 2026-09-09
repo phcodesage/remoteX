@@ -26,7 +26,18 @@ from server.auth import (
     verify_password,
 )
 from server.config import Settings, get_settings
-from server.database import AuditEvent, Device, RemoteSession, User, ensure_utc, get_db, initialize_database, make_session_factory, utcnow
+from server.database import (
+    AuditEvent,
+    Device,
+    PairingCode,
+    RemoteSession,
+    User,
+    ensure_utc,
+    get_db,
+    initialize_database,
+    make_session_factory,
+    utcnow,
+)
 from server.ice import get_ice_servers
 from server.websocket_manager import WebSocketManager
 
@@ -49,10 +60,14 @@ class PairingClaim(BaseModel):
 class SessionResponse(BaseModel):
     id: str
     device_id: str
+    device_name: str | None = None
     status: str
     pairing_code: str | None = None
     signaling_token: str | None = None
     expires_at: str
+
+
+ATTENDED_USER_EMAIL = "attended@remotex.local"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -115,6 +130,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=401, detail="Invalid device token")
         return device
 
+    def get_attended_user(db: Session) -> User:
+        """Return the internal owner for the no-account attended-support mode.
+
+        This is deliberately not exposed as a login identity. It keeps the
+        existing database shape compatible while authorization is provided by
+        a one-time pairing code and the host's explicit approval.
+        """
+        user = db.scalar(select(User).where(User.email == ATTENDED_USER_EMAIL))
+        if user:
+            return user
+        user = User(email=ATTENDED_USER_EMAIL, password_hash=hash_password(secrets.token_urlsafe(32)))
+        db.add(user)
+        db.flush()
+        return user
+
+    def create_pairing_code(db: Session, device: Device) -> tuple[str, PairingCode]:
+        now = utcnow()
+        for old_code in db.scalars(
+            select(PairingCode).where(PairingCode.device_id == device.id, PairingCode.used_at.is_(None))
+        ).all():
+            old_code.used_at = now
+        plain_code = f"{secrets.randbelow(1000):03d}-{secrets.randbelow(1000):03d}"
+        pairing = PairingCode(
+            device_id=device.id,
+            code_hash=sha256_hex(plain_code),
+            expires_at=now + timedelta(minutes=settings.pairing_ttl_minutes),
+        )
+        db.add(pairing)
+        return plain_code, pairing
+
     def get_session_or_404(db: Session, session_id: str) -> RemoteSession:
         remote_session = db.get(RemoteSession, session_id)
         if not remote_session:
@@ -173,6 +218,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             db.commit()
             db.refresh(user)
         return AuthResponse(access_token=issue_user_token(user, settings), user_id=user.id)
+
+    @app.post("/api/v1/guest/devices/register")
+    def register_attended_device(
+        payload: DeviceRegistration,
+        db: Session = Depends(get_db),
+    ) -> dict:
+        """Register a host for attended support without a user account.
+
+        Registration alone cannot start a control session. The controller
+        still needs a short-lived pairing code, and the host must approve the
+        incoming request locally.
+        """
+        user = get_attended_user(db)
+        device_token = secrets.token_urlsafe(32)
+        device = Device(
+            user_id=user.id,
+            name=payload.name,
+            platform=payload.platform,
+            public_key=payload.public_key,
+            device_token_hash=sha256_hex(device_token),
+            last_seen_at=utcnow(),
+        )
+        db.add(device)
+        db.flush()
+        pairing_code, pairing = create_pairing_code(db, device)
+        db.commit()
+        return {
+            "device_id": device.id,
+            "device_token": device_token,
+            "name": device.name,
+            "pairing_code": pairing_code,
+            "pairing_expires_at": iso(pairing.expires_at),
+        }
+
+    @app.post("/api/v1/guest/devices/pairing")
+    def new_attended_pairing_code(request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
+        token = request.headers.get("X-Device-Token")
+        if not token:
+            raise HTTPException(status_code=401, detail="Device registration is required")
+        device = get_device_by_token(db, token)
+        pairing_code, pairing = create_pairing_code(db, device)
+        db.commit()
+        return {"pairing_code": pairing_code, "expires_at": iso(pairing.expires_at) or ""}
 
     @app.post("/api/v1/devices/register")
     def register_device(
@@ -309,6 +397,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if not remote_session or ensure_utc(remote_session.expires_at) < utcnow():
             raise HTTPException(status_code=404, detail="Pairing code is invalid or expired")
+        device = db.get(Device, remote_session.device_id)
         # Pairing is one-time: replace the stored digest after a successful claim.
         remote_session.pairing_hash = sha256_hex(secrets.token_urlsafe(32))
         remote_session.controller_user_id = user.id
@@ -317,8 +406,65 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return SessionResponse(
             id=remote_session.id,
             device_id=remote_session.device_id,
+            device_name=device.name,
             status=remote_session.status,
             signaling_token=issue_signaling_token(user.id, remote_session.id, "controller", settings),
+            expires_at=iso(remote_session.expires_at) or "",
+        )
+
+    @app.post("/api/v1/guest/sessions/pair", response_model=SessionResponse)
+    async def claim_attended_pairing_code(
+        payload: PairingClaim,
+        db: Session = Depends(get_db),
+    ) -> SessionResponse:
+        pairing = db.scalar(
+            select(PairingCode).where(
+                PairingCode.code_hash == sha256_hex(payload.pairing_code),
+                PairingCode.used_at.is_(None),
+            )
+        )
+        if not pairing or ensure_utc(pairing.expires_at) < utcnow():
+            raise HTTPException(status_code=404, detail="Pairing code is invalid or expired")
+        device = db.get(Device, pairing.device_id)
+        if not device or device.revoked_at:
+            raise HTTPException(status_code=404, detail="Remote device is unavailable")
+
+        pairing.used_at = utcnow()
+        controller = get_attended_user(db)
+        remote_session = RemoteSession(
+            device_id=device.id,
+            controller_user_id=controller.id,
+            status=(
+                SessionStatus.AWAITING_APPROVAL
+                if manager.agent_online(device.id)
+                else SessionStatus.PENDING
+            ),
+            pairing_hash=sha256_hex(secrets.token_urlsafe(32)),
+            expires_at=utcnow() + timedelta(seconds=600),
+        )
+        db.add(remote_session)
+        db.flush()
+        audit(db, "attended_session_created", remote_session.id, None, {"device_id": device.id})
+        db.commit()
+        await manager.send_to_agent(
+            device.id,
+            {
+                "type": "session_request",
+                "session_id": remote_session.id,
+                "payload": {
+                    "pairing_code": payload.pairing_code,
+                    "controller": "RemoteX controller",
+                    "agent_signal_token": issue_signaling_token(device.id, remote_session.id, "agent", settings),
+                    "expires_at": iso(remote_session.expires_at),
+                },
+            },
+        )
+        return SessionResponse(
+            id=remote_session.id,
+            device_id=device.id,
+            device_name=device.name,
+            status=remote_session.status,
+            signaling_token=issue_signaling_token(controller.id, remote_session.id, "controller", settings),
             expires_at=iso(remote_session.expires_at) or "",
         )
 
@@ -354,18 +500,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await manager.forward(session_id, "agent", {"type": SignalType.SESSION_REJECTED, "session_id": session_id, "payload": {}})
         return {"status": "rejected"}
 
-    @app.get("/api/v1/sessions/{session_id}", response_model=SessionResponse)
-    def get_session(
-        session_id: str,
-        user: User = Depends(current_user),
-        db: Session = Depends(get_db),
-    ) -> SessionResponse:
+    def authorize_controller_session(request: Request, session_id: str, db: Session) -> RemoteSession:
         remote_session = get_session_or_404(db, session_id)
-        if remote_session.controller_user_id != user.id:
+        authorization = request.headers.get("Authorization", "")
+        if authorization.lower().startswith("bearer "):
+            user = decode_user_token(authorization[7:].strip(), settings, db)
+            if remote_session.controller_user_id != user.id:
+                raise HTTPException(status_code=403, detail="Session access denied")
+            return remote_session
+        session_token = request.headers.get("X-Session-Token")
+        if not session_token:
+            raise HTTPException(status_code=401, detail="Session is not authorized")
+        subject = decode_signaling_token(session_token, session_id, "controller", settings)
+        if subject != remote_session.controller_user_id:
             raise HTTPException(status_code=403, detail="Session access denied")
+        return remote_session
+
+    @app.get("/api/v1/sessions/{session_id}", response_model=SessionResponse)
+    def get_session(session_id: str, request: Request, db: Session = Depends(get_db)) -> SessionResponse:
+        remote_session = authorize_controller_session(request, session_id, db)
+        device = db.get(Device, remote_session.device_id)
         return SessionResponse(
             id=remote_session.id,
             device_id=remote_session.device_id,
+            device_name=device.name,
             status=remote_session.status,
             expires_at=iso(remote_session.expires_at) or "",
         )
@@ -373,15 +531,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/v1/sessions/{session_id}/revoke")
     async def revoke_session(
         session_id: str,
-        user: User = Depends(current_user),
+        request: Request,
         db: Session = Depends(get_db),
     ) -> dict[str, str]:
-        remote_session = get_session_or_404(db, session_id)
-        if remote_session.controller_user_id != user.id:
-            raise HTTPException(status_code=403, detail="Session access denied")
+        remote_session = authorize_controller_session(request, session_id, db)
         remote_session.status = SessionStatus.REVOKED
         remote_session.ended_at = utcnow()
-        audit(db, "session_revoked", session_id, user.id)
+        audit(db, "session_revoked", session_id, remote_session.controller_user_id)
         db.commit()
         message = {"type": SignalType.SESSION_REVOKED, "session_id": session_id, "payload": {}}
         await manager.forward(session_id, "controller", message)

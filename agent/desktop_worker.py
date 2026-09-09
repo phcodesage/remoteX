@@ -22,6 +22,7 @@ class AgentWorker(QThread):
 
     session_request = Signal(str, str, str)  # session_id, controller, pairing_code
     device_ready = Signal(str)
+    pairing_code = Signal(str)
     status_changed = Signal(str)
     error = Signal(str)
 
@@ -60,6 +61,12 @@ class AgentWorker(QThread):
             response = await client.get("/api/v1/config/ice")
             response.raise_for_status()
             ice_servers = response.json().get("ice_servers", [])
+            pairing = await client.post(
+                "/api/v1/guest/devices/pairing",
+                headers={"X-Device-Token": credentials.device_token},
+            )
+            pairing.raise_for_status()
+            self.pairing_code.emit(pairing.json()["pairing_code"])
 
         agent_url = websocket_url(
             self.server_url,
@@ -93,7 +100,7 @@ class AgentWorker(QThread):
                         pending[session_id] = payload
                         self.session_request.emit(
                             session_id,
-                            payload.get("controller", "Authenticated controller"),
+                            payload.get("controller", "RemoteX controller"),
                             payload.get("pairing_code", "Verified"),
                         )
                     receive_task = asyncio.create_task(socket.recv())

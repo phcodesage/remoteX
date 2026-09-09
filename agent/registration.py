@@ -37,20 +37,20 @@ class AgentRegistration:
                 credentials = None
             else:
                 return identity, credentials
-        if not owner_token:
-            raise RuntimeError(
-                "This device is not enrolled. Set REMOTE_ACCESS_TOKEN or REMOTE_OWNER_TOKEN for first enrollment."
-            )
         async with httpx.AsyncClient(base_url=self.settings.server_url, timeout=15) as client:
-            response = await client.post(
-                "/api/v1/devices/register",
-                headers={"Authorization": f"Bearer {owner_token}"},
-                json={
-                    "name": self.settings.device_name,
-                    "platform": f"{platform.system()} {platform.release()}",
-                    "public_key": identity.public_key_b64,
-                },
-            )
+            request = {
+                "name": self.settings.device_name,
+                "platform": f"{platform.system()} {platform.release()}",
+                "public_key": identity.public_key_b64,
+            }
+            if owner_token:
+                response = await client.post(
+                    "/api/v1/devices/register",
+                    headers={"Authorization": f"Bearer {owner_token}"},
+                    json=request,
+                )
+            else:
+                response = await client.post("/api/v1/guest/devices/register", json=request)
             response.raise_for_status()
             payload = response.json()
         credentials = DeviceCredentials(payload["device_id"], payload["device_token"])

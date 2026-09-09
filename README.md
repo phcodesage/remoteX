@@ -33,32 +33,9 @@ After setup, every role can be launched through the same environment:
 
 Alternatively, activate the same environment first with `source .venv/bin/activate` and then use `python run.py`.
 
-For the current tunnel, run `.venv/bin/python run.py backend` on the old/host Mac. FastAPI listens on `127.0.0.1:8080`; configure the tunnel to forward `remotex.chat-x.site` to that local port. Run `.venv/bin/python run.py` on the other computer and set its control domain to `https://remotex.chat-x.site`. Both computers must use the same authenticated server account/token.
+For the current tunnel, run `.venv/bin/python run.py backend` on the old/host Mac. FastAPI listens on `127.0.0.1:8080`; configure the tunnel to forward `remotex.chat-x.site` to that local port. Run `.venv/bin/python run.py` on both computers and set the control domain to `https://remotex.chat-x.site` if needed.
 
-The host can create a local prototype access token with:
-
-```bash
-.venv/bin/python run.py backend
-curl -s -X POST http://127.0.0.1:8080/api/v1/auth/local
-```
-
-Paste the returned `access_token` into **Settings → Shared access token** on each desktop UI. Alternatively, put it in `REMOTE_ACCESS_TOKEN` in `.env`. RemoteX does not require a sign-in screen.
-
-The prototype has no sign-in or sign-up screen. With `REMOTE_LOCAL_AUTH_ENABLED=true`, a localhost server creates a local session automatically. For a shared/external server, put an existing access token in `REMOTE_ACCESS_TOKEN`; the desktop UI still stays single-screen and does not show auth forms.
-
-For external/shared auth, create a user token with:
-
-```bash
-curl -s http://127.0.0.1:8080/api/v1/auth/register \
-  -H 'content-type: application/json' \
-  -d '{"email":"you@example.com","password":"change-me-now"}'
-```
-
-Copy the returned `access_token` into `REMOTE_ACCESS_TOKEN` only when using a shared server:
-
-```bash
-.venv/bin/python run.py
-```
+RemoteX uses attended pairing mode by default: no signup, password, or copied access token is required. Each desktop shows a temporary pairing code. Enter the remote computer's code on the controller, then the remote user must click **Allow Access**. The server's device/session capabilities are generated and stored internally; users do not handle them.
 
 `.venv/bin/python run.py agent` opens the exact same UI. Each computer can therefore be both a controller and a remote device:
 
@@ -97,7 +74,7 @@ deployment/   Reverse proxy and Cloudflare TURN notes
 
 ## Security boundaries in this MVP
 
-- Passwords use Argon2id through `argon2-cffi`.
+- Legacy account endpoints still use Argon2id through `argon2-cffi`, but the desktop attended flow does not ask users to create accounts.
 - Device tokens are stored server-side only as SHA-256 hashes.
 - Devices have an Ed25519 identity key stored locally.
 - Pairing requests expire and are shown to the remote user.

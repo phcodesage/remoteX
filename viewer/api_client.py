@@ -12,6 +12,7 @@ class ApiClient:
         self.base_url = base_url.rstrip("/")
         self.token = ""
         self.user_id = ""
+        self.session_tokens: dict[str, str] = {}
 
     def _request(self, method: str, path: str, **kwargs):
         headers = kwargs.pop("headers", {})
@@ -59,13 +60,24 @@ class ApiClient:
         return self._request("POST", "/api/v1/sessions", json={"device_id": device_id}).json()
 
     def claim_pairing(self, pairing_code: str) -> dict:
-        return self._request("POST", "/api/v1/sessions/pair", json={"pairing_code": pairing_code}).json()
+        session = self._request(
+            "POST", "/api/v1/guest/sessions/pair", json={"pairing_code": pairing_code}
+        ).json()
+        if session.get("signaling_token"):
+            self.session_tokens[session["id"]] = session["signaling_token"]
+        return session
 
     def session(self, session_id: str) -> dict:
-        return self._request("GET", f"/api/v1/sessions/{session_id}").json()
+        headers = {}
+        if session_id in self.session_tokens:
+            headers["X-Session-Token"] = self.session_tokens[session_id]
+        return self._request("GET", f"/api/v1/sessions/{session_id}", headers=headers).json()
 
     def revoke_session(self, session_id: str) -> None:
-        self._request("POST", f"/api/v1/sessions/{session_id}/revoke")
+        headers = {}
+        if session_id in self.session_tokens:
+            headers["X-Session-Token"] = self.session_tokens[session_id]
+        self._request("POST", f"/api/v1/sessions/{session_id}/revoke", headers=headers)
 
     def ice_servers(self) -> list[dict]:
         return self._request("GET", "/api/v1/config/ice").json().get("ice_servers", [])

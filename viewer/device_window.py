@@ -55,52 +55,33 @@ class DashboardWindow(QWidget):
         self.client = client
         self.session_windows: list[SessionWindow] = []
         self.devices: list[dict] = []
-        self.local_device_id: str | None = None
-        self.device_layout = QVBoxLayout()
         self.message = QLabel("Ready")
         self.message.setObjectName("muted")
-        refresh = QPushButton("Refresh")
-        refresh.setObjectName("utility")
-        refresh.clicked.connect(self.load_devices)
         heading = QHBoxLayout()
-        heading.addWidget(QLabel("Other devices"))
+        heading.addWidget(QLabel("Connect to another computer"))
         heading.addStretch()
         heading.addWidget(self.message)
-        pair = QPushButton("Pairing code")
+        pair = QPushButton("Enter pairing code")
         pair.setObjectName("primary")
         pair.clicked.connect(self.claim_pairing)
         heading.addWidget(pair)
-        heading.addWidget(refresh)
+        instructions = QLabel(
+            "On the remote computer, open RemoteX and share the six-digit pairing code. "
+            "The remote user must click Allow before screen control starts."
+        )
+        instructions.setObjectName("muted")
+        instructions.setWordWrap(True)
         root = QVBoxLayout(self)
         root.addLayout(heading)
-        root.addLayout(self.device_layout)
+        root.addWidget(instructions)
         root.addStretch()
         self.load_devices()
 
     def load_devices(self) -> None:
-        while self.device_layout.count():
-            item = self.device_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        try:
-            devices = self.client.devices()
-            if self.local_device_id:
-                devices = [device for device in devices if device["id"] != self.local_device_id]
-            self.devices = devices
-        except ApiError as exc:
-            self.show_message(str(exc))
-            return
-        if not devices:
-            empty = QLabel("No other devices yet. Start RemoteX on another computer to connect.")
-            empty.setObjectName("muted")
-            self.device_layout.addWidget(empty)
-            return
-        for device in devices:
-            self.device_layout.addWidget(DeviceCard(self.client, device))
+        self.show_message("Ready — use the remote computer's pairing code.")
 
     def set_local_device_id(self, device_id: str) -> None:
-        self.local_device_id = device_id
-        self.load_devices()
+        return
 
     def claim_pairing(self) -> None:
         code, accepted = QInputDialog.getText(self, "Connect a remote device", "Enter pairing code (000-000):")
@@ -111,10 +92,7 @@ class DashboardWindow(QWidget):
         except ApiError as exc:
             self.show_message(str(exc))
             return
-        device_name = next(
-            (device["name"] for device in self.devices if device["id"] == session["device_id"]),
-            "Remote device",
-        )
+        device_name = session.get("device_name") or "Remote device"
         window = SessionWindow(self.client, session, device_name)
         window.show()
         self.session_windows.append(window)

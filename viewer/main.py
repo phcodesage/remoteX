@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from common.preferences import AppPreferences, configured_value, load_preferences, save_preferences
+from common.preferences import AppPreferences, load_preferences, save_preferences
 from viewer.api_client import ApiClient, ApiError
 from viewer.settings_dialog import SettingsDialog
 from viewer.theme.styles import stylesheet
@@ -47,6 +47,10 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(QLabel("THIS COMPUTER"))
         side_layout.addWidget(QLabel(platform.node() or "This computer"))
         side_layout.addWidget(QLabel("● Ready for attended support"))
+        self.pairing_label = QLabel("Pairing code\nConnecting…")
+        self.pairing_label.setObjectName("pairingCode")
+        self.pairing_label.setWordWrap(True)
+        side_layout.addWidget(self.pairing_label)
         side_layout.addSpacing(18)
         side_layout.addWidget(QLabel("WORKSPACE"))
         side_layout.addWidget(QLabel("Devices"))
@@ -112,8 +116,8 @@ class MainWindow(QMainWindow):
         self.mode_label.setText(f"Control server\n{public}")
         self.connection_description.setText(
             f"This computer will connect to the control server at {target}. "
-            "To make a computer the host, run `python3 run.py backend` separately "
-            "on that computer."
+            "No account or copied token is needed. To make a computer the host, "
+            "run `python3 run.py backend` separately on that computer."
         )
 
     def connect_to_server(self) -> None:
@@ -121,21 +125,9 @@ class MainWindow(QMainWindow):
         self.connection_status.setText("Connecting…")
         try:
             client = ApiClient(self.preferences.effective_server_url)
-            access_token = self.preferences.access_token or configured_value("REMOTE_ACCESS_TOKEN") or configured_value(
-                "REMOTE_OWNER_TOKEN"
-            )
-            if access_token:
-                client.token = access_token
-            else:
-                client.local_authenticate()
             self.attach_client(client)
         except (ApiError, OSError, RuntimeError) as exc:
             message = str(exc)
-            if message == "Local auth is disabled":
-                message = (
-                    "Server is reachable, but this tunneled connection needs a shared access token. "
-                    "Open Settings and paste the token created on the backend host."
-                )
             self.connection_status.setText(f"Connection unavailable: {message}")
             self.start_button.setEnabled(True)
 
@@ -156,6 +148,7 @@ class MainWindow(QMainWindow):
             os.getenv("REMOTE_DEVICE_NAME", platform.node() or "This computer"),
         )
         self.agent_worker.device_ready.connect(self.dashboard.set_local_device_id)
+        self.agent_worker.pairing_code.connect(self.on_pairing_code)
         self.agent_worker.status_changed.connect(self.on_agent_status)
         self.agent_worker.session_request.connect(self.handle_session_request)
         self.agent_worker.error.connect(self.on_agent_error)
@@ -163,8 +156,9 @@ class MainWindow(QMainWindow):
 
     def on_agent_status(self, message: str) -> None:
         self.agent_status.setText(message)
-        if message == "This computer is online" and self.dashboard:
-            self.dashboard.load_devices()
+
+    def on_pairing_code(self, code: str) -> None:
+        self.pairing_label.setText(f"Pairing code\n{code}")
 
     def on_agent_error(self, message: str) -> None:
         self.agent_status.setText(f"Agent: {message}")

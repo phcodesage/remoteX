@@ -21,6 +21,12 @@ async def run_agent_async() -> None:
         response = await client.get("/api/v1/config/ice")
         response.raise_for_status()
         ice_config = response.json()
+        pairing = await client.post(
+            "/api/v1/guest/devices/pairing",
+            headers={"X-Device-Token": credentials.device_token},
+        )
+        pairing.raise_for_status()
+        print(f"Pairing code: {pairing.json()['pairing_code']}")
 
     agent_url = websocket_url(
         settings.server_url,
