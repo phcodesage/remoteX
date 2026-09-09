@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AgentSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_prefix="REMOTE_")
 
-    server_url: str = "http://127.0.0.1:8000"
+    server_url: str = "https://remotex.chat-x.site"
     owner_token: str = ""
     device_name: str = "Remote computer"
     device_data_dir: str = "~/.python-remote"
@@ -18,4 +18,3 @@ class AgentSettings(BaseSettings):
 @lru_cache
 def get_agent_settings() -> AgentSettings:
     return AgentSettings()
-

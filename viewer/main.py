@@ -107,28 +107,19 @@ class MainWindow(QMainWindow):
         return panel
 
     def update_connection_panel(self) -> None:
-        mode = "Host mode" if self.preferences.host_mode else "Remote mode"
         target = self.preferences.effective_server_url
         public = self.preferences.server_url
-        self.mode_label.setText(f"{mode}\n{public}")
-        if self.preferences.host_mode:
-            self.connection_description.setText(
-                f"This computer will host the control server on {target}. "
-                f"The tunnel domain for other computers is {public}."
-            )
-        else:
-            self.connection_description.setText(
-                f"This computer will connect to the tunneled control server at {public}."
-            )
+        self.mode_label.setText(f"Control server\n{public}")
+        self.connection_description.setText(
+            f"This computer will connect to the control server at {target}. "
+            "To make a computer the host, run `python3 run.py backend` separately "
+            "on that computer."
+        )
 
     def connect_to_server(self) -> None:
         self.start_button.setEnabled(False)
         self.connection_status.setText("Connecting…")
         try:
-            if self.preferences.host_mode:
-                from run import ensure_local_server
-
-                ensure_local_server()
             client = ApiClient(self.preferences.effective_server_url)
             access_token = configured_value("REMOTE_ACCESS_TOKEN") or configured_value(
                 "REMOTE_OWNER_TOKEN"

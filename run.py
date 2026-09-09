@@ -5,68 +5,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import os
 import platform
-import threading
-import time
-from urllib.parse import urlparse
-from urllib.request import urlopen
 from pathlib import Path
 
-from common.preferences import load_preferences
-
 VERSION = "0.1.0"
-
-
-def _healthy(url: str) -> bool:
-    try:
-        with urlopen(url.rstrip("/") + "/healthz", timeout=0.5) as response:
-            return response.status == 200
-    except Exception:
-        return False
-
-
-def ensure_local_server() -> None:
-    """Start FastAPI automatically for the default single-command local app."""
-    from server.config import get_settings
-
-    settings = get_settings()
-    preferences = load_preferences()
-    if not preferences.host_mode:
-        return
-    parsed = urlparse(preferences.effective_server_url)
-    local_hosts = {"127.0.0.1", "localhost", "::1"}
-    if parsed.hostname not in local_hosts:
-        return
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
-    if _healthy(base_url):
-        return
-
-    import uvicorn
-    from server.app import create_app
-
-    host = "127.0.0.1" if parsed.hostname in {"localhost", "127.0.0.1"} else "::1"
-    host_settings = settings.model_copy(
-        update={
-            "server_url": preferences.effective_server_url,
-            "host": host,
-            "port": preferences.host_port,
-            "local_auth_enabled": True,
-        }
-    )
-    thread = threading.Thread(
-        target=lambda: uvicorn.run(
-            create_app(host_settings), host=host, port=preferences.host_port, log_level="warning"
-        ),
-        name="remotex-server",
-        daemon=True,
-    )
-    thread.start()
-    for _ in range(50):
-        if _healthy(base_url):
-            return
-        time.sleep(0.1)
-    print(f"Warning: local server did not become ready at {base_url}")
 
 
 def doctor() -> int:
@@ -107,7 +49,11 @@ def doctor() -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Python remote-support system")
-    parser.add_argument("role", nargs="?", choices=["desktop", "server", "agent", "viewer", "doctor", "version"])
+    parser.add_argument(
+        "role",
+        nargs="?",
+        choices=["desktop", "server", "backend", "agent", "viewer", "doctor", "version"],
+    )
     args = parser.parse_args()
     role = args.role or "desktop"
     if role == "version":
@@ -115,7 +61,7 @@ def main() -> int:
         return 0
     if role == "doctor":
         return doctor()
-    if role == "server":
+    if role in {"server", "backend"}:
         from server.app import run_server
         run_server()
         return 0
