@@ -43,7 +43,7 @@ def _is_loopback(value: str) -> bool:
     return parsed.hostname in {"127.0.0.1", "localhost", "::1"}
 
 
-def _configured_value(name: str) -> str | None:
+def configured_value(name: str) -> str | None:
     direct = os.getenv(name)
     if direct is not None:
         return direct
@@ -59,9 +59,9 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
 
 
 def _default_preferences() -> AppPreferences:
-    env_url = (_configured_value("REMOTE_SERVER_URL") or "").strip()
-    autostart = _as_bool(_configured_value("REMOTE_AUTOSTART_SERVER"))
-    explicit_host_mode = _configured_value("REMOTE_HOST_MODE")
+    env_url = (configured_value("REMOTE_SERVER_URL") or "").strip()
+    autostart = _as_bool(configured_value("REMOTE_AUTOSTART_SERVER"))
+    explicit_host_mode = configured_value("REMOTE_HOST_MODE")
     host_mode = (
         _as_bool(explicit_host_mode)
         if explicit_host_mode is not None
@@ -69,7 +69,7 @@ def _default_preferences() -> AppPreferences:
     )
     public_url = DEFAULT_PUBLIC_SERVER_URL if not env_url or _is_loopback(env_url) else env_url
     try:
-        port = int(_configured_value("REMOTE_HOST_PORT") or str(DEFAULT_HOST_PORT))
+        port = int(configured_value("REMOTE_HOST_PORT") or str(DEFAULT_HOST_PORT))
     except ValueError:
         port = DEFAULT_HOST_PORT
     return AppPreferences(server_url=normalize_server_url(public_url), host_mode=host_mode, host_port=port)

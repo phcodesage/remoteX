@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from agent.desktop_worker import AgentWorker
-from common.preferences import AppPreferences, load_preferences, save_preferences
+from common.preferences import AppPreferences, configured_value, load_preferences, save_preferences
 from viewer.api_client import ApiClient, ApiError
 from viewer.device_window import DashboardWindow
 from viewer.settings_dialog import SettingsDialog
@@ -131,7 +131,7 @@ def run_unified() -> None:
     app.setStyleSheet(stylesheet())
     preferences = load_preferences()
     client = ApiClient(preferences.effective_server_url)
-    access_token = os.getenv("REMOTE_ACCESS_TOKEN") or os.getenv("REMOTE_OWNER_TOKEN")
+    access_token = configured_value("REMOTE_ACCESS_TOKEN") or configured_value("REMOTE_OWNER_TOKEN")
     if access_token:
         client.token = access_token
     else:
