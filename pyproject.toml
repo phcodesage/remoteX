@@ -8,8 +8,8 @@ version = "0.1.0"
 description = "Attended Python remote-support system using FastAPI, PySide6, and WebRTC"
 requires-python = ">=3.11"
 dependencies = [
-    "aiortc>=1.15.0,<2",
-    "av>=17.1.0,<18",
+    "aiortc>=1.10.1,<2",
+    "av>=13.1.0,<18",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "websockets>=13",

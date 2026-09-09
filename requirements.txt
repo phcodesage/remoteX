@@ -1,7 +1,7 @@
-aiortc>=1.15.0,<2
-# aiortc 1.15 supports PyAV 14-17. Pin the newest supported line so Python 3.13
-# receives a prebuilt wheel instead of trying to compile the older PyAV 12 source.
-av>=17.1.0,<18
+# Keep the range broad enough for older macOS wheels. pip will choose aiortc
+# 1.15/PyAV 17 on modern macOS and aiortc 1.10/PyAV 13 on legacy macOS.
+aiortc>=1.10.1,<2
+av>=13.1.0,<18
 fastapi>=0.115
 uvicorn[standard]>=0.30
 websockets>=13
