@@ -120,7 +120,6 @@ def main() -> int:
         run_server()
         return 0
     if role in {"desktop", "agent", "viewer"}:
-        ensure_local_server()
         from viewer.main import run_unified
         run_unified()
         return 0
