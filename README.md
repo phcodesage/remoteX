@@ -34,6 +34,15 @@ Alternatively, activate the same environment first with `source .venv/bin/activa
 
 For the current tunnel, enable **Make this computer the host** on the old/host Mac and keep the domain as `https://remotex.chat-x.site`. RemoteX then starts FastAPI on `127.0.0.1:8080`; configure the tunnel to forward `remotex.chat-x.site` to that local port. On the other computer, leave host mode off so it connects to the same domain. Both computers must use the same authenticated server account/token.
 
+If the UI cannot open because the tunnel is currently offline, enable host mode before startup in `.env` on the host computer:
+
+```dotenv
+REMOTE_HOST_MODE=true
+REMOTE_HOST_PORT=8080
+REMOTE_SERVER_URL=https://remotex.chat-x.site
+REMOTE_AUTOSTART_SERVER=true
+```
+
 The prototype has no sign-in or sign-up screen. With `REMOTE_LOCAL_AUTH_ENABLED=true`, a localhost server creates a local session automatically. For a shared/external server, put an existing access token in `REMOTE_ACCESS_TOKEN`; the desktop UI still stays single-screen and does not show auth forms.
 
 For external/shared auth, create a user token with:
